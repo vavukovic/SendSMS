@@ -56,13 +56,16 @@ import java.awt.event.ItemListener;
 import java.awt.event.ItemEvent;
 import java.io.UnsupportedEncodingException;
 import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
+import java.awt.FlowLayout;
 
 public class SendSMS extends JFrame {
 	private static final long serialVersionUID = 1L;
 	
-	private ClientSMS client;	
+	private volatile ClientSMS client;	
 	private JTextField txtSMSSender;
 	private JTextField txtSMSDestination;
 	private JTextField txtHLRDestination;
@@ -85,7 +88,7 @@ public class SendSMS extends JFrame {
 	private final JCheckBox chkFixDestOptions;
 	private final JCheckBox chkFixSourceOptions;
 	private final JCheckBox chkSendAsFlash;
-	private DefaultListModel smsLogListModel = new DefaultListModel();
+	private volatile DefaultListModel smsLogListModel = new DefaultListModel();
 	private DefaultListModel hlrLogListModel = new DefaultListModel();
 	private DefaultListModel registerSenderLogListModel = new DefaultListModel();
 	private final JRadioButton rbSmpp;
@@ -100,6 +103,8 @@ public class SendSMS extends JFrame {
 	private JTextField txtPushUrl;
 	private final JCheckBox chkPushMessage;
 	private JTextField txtProtocolId;
+	private volatile JList listSMS;
+	private JList listHLR;
 	
 	/**
 	 * Launch the application.
@@ -129,7 +134,7 @@ public class SendSMS extends JFrame {
 				client.disconnect();
 			}
 		});
-		setBounds(100, 100, 835, 624);
+		setBounds(100, 100, 835, 644);
 		
 		JTabbedPane tabbedPane = new JTabbedPane(JTabbedPane.TOP);
 		
@@ -190,7 +195,7 @@ public class SendSMS extends JFrame {
 		
 		getContentPane().setLayout(new BorderLayout(0, 0));
 		
-		JList listSMS = new JList(smsLogListModel);
+		listSMS = new JList(smsLogListModel);
 		listSMS.setVisibleRowCount(-1);
 		JScrollPane pane = new JScrollPane(listSMS);
 		panelLog.add(pane, "name_370372406212754");
@@ -323,6 +328,7 @@ public class SendSMS extends JFrame {
 					} catch (Exception e1) {
 						e1.printStackTrace();
 						smsLogListModel.addElement(e1.getMessage());
+						smsLogListModel.removeElement("Initializing...");
 					}	
 				}
 			}
@@ -343,6 +349,7 @@ public class SendSMS extends JFrame {
 					} catch (Exception e1) {
 						e1.printStackTrace();
 						smsLogListModel.addElement(e1.getMessage());
+						smsLogListModel.removeElement("Initializing...");
 					}	
 				}
 			}
@@ -369,7 +376,7 @@ public class SendSMS extends JFrame {
 		chkFixText.setBounds(6, 20, 119, 23);
 		panel_9.add(chkFixText);
 		
-		chkFixDestOptions = new JCheckBox("Fix Destination Options");
+		chkFixDestOptions = new JCheckBox("Fix Dest Options");
 		chkFixDestOptions.addItemListener(new ItemListener() {
 			public void itemStateChanged(ItemEvent e) {
 				if (chkFixDestOptions.isSelected()) {
@@ -385,7 +392,7 @@ public class SendSMS extends JFrame {
 		});
 		chkFixDestOptions.setToolTipText("'Dest Ton' and 'Npi' parameters are set automatically.");
 		chkFixDestOptions.setActionCommand("FixDestination");
-		chkFixDestOptions.setBounds(6, 58, 170, 23);
+		chkFixDestOptions.setBounds(6, 72, 156, 23);
 		panel_9.add(chkFixDestOptions);
 		
 		chkFixSourceOptions = new JCheckBox("Fix Source Options");
@@ -404,14 +411,14 @@ public class SendSMS extends JFrame {
 		});
 		chkFixSourceOptions.setToolTipText("'Src Ton' and 'Npi' parameters are set automatically.");
 		chkFixSourceOptions.setActionCommand("FixSender");
-		chkFixSourceOptions.setBounds(6, 39, 150, 23);
+		chkFixSourceOptions.setBounds(6, 46, 146, 23);
 		panel_9.add(chkFixSourceOptions);
 		
 		JPanel panel_12 = new JPanel();
 		panel_12.setBorder(new TitledBorder(UIManager.getBorder("TitledBorder.border"), "Http Message Settings", TitledBorder.LEADING, TitledBorder.TOP, null, new Color(0, 0, 0)));
-		panel_12.setLayout(null);
 		
 		chkPushMessage = new JCheckBox("Push message");
+		chkPushMessage.setBounds(6, 20, 227, 23);
 		chkPushMessage.setSelected(true);
 		chkPushMessage.addItemListener(new ItemListener() {
 			public void itemStateChanged(ItemEvent e) {
@@ -423,15 +430,15 @@ public class SendSMS extends JFrame {
 				}
 			}
 		});
-		chkPushMessage.setBounds(6, 16, 227, 23);
+		panel_12.setLayout(null);
 		panel_12.add(chkPushMessage);
 		
 		JLabel lblPushUrl = new JLabel("Push Url:");
-		lblPushUrl.setBounds(9, 43, 64, 14);
+		lblPushUrl.setBounds(9, 47, 64, 14);
 		panel_12.add(lblPushUrl);
 		
 		txtPushUrl = new JTextField();
-		txtPushUrl.setBounds(73, 40, 178, 20);
+		txtPushUrl.setBounds(73, 44, 178, 20);
 		panel_12.add(txtPushUrl);
 		txtPushUrl.setColumns(10);
 		GroupLayout gl_panelSendSMS = new GroupLayout(panelSendSMS);
@@ -442,16 +449,21 @@ public class SendSMS extends JFrame {
 					.addGroup(gl_panelSendSMS.createParallelGroup(Alignment.LEADING)
 						.addComponent(panelSMSData, GroupLayout.PREFERRED_SIZE, 523, GroupLayout.PREFERRED_SIZE)
 						.addComponent(panelLog, GroupLayout.DEFAULT_SIZE, 523, Short.MAX_VALUE))
-					.addGap(10)
 					.addGroup(gl_panelSendSMS.createParallelGroup(Alignment.LEADING)
+						.addGroup(Alignment.TRAILING, gl_panelSendSMS.createSequentialGroup()
+							.addPreferredGap(ComponentPlacement.RELATED)
+							.addComponent(panel_12, GroupLayout.DEFAULT_SIZE, 261, Short.MAX_VALUE)
+							.addGap(2))
 						.addGroup(gl_panelSendSMS.createSequentialGroup()
-							.addComponent(panel_8, GroupLayout.PREFERRED_SIZE, 75, GroupLayout.PREFERRED_SIZE)
-							.addGap(4)
-							.addComponent(panel_9, GroupLayout.PREFERRED_SIZE, 182, GroupLayout.PREFERRED_SIZE))
-						.addComponent(panel_7, GroupLayout.PREFERRED_SIZE, 259, GroupLayout.PREFERRED_SIZE)
-						.addComponent(panel_6, GroupLayout.PREFERRED_SIZE, 259, GroupLayout.PREFERRED_SIZE)
-						.addComponent(panel_12, GroupLayout.PREFERRED_SIZE, 261, GroupLayout.PREFERRED_SIZE))
-					.addContainerGap())
+							.addGap(10)
+							.addGroup(gl_panelSendSMS.createParallelGroup(Alignment.LEADING)
+								.addComponent(panel_6, Alignment.TRAILING, GroupLayout.DEFAULT_SIZE, 259, Short.MAX_VALUE)
+								.addGroup(gl_panelSendSMS.createSequentialGroup()
+									.addComponent(panel_8, GroupLayout.PREFERRED_SIZE, 95, GroupLayout.PREFERRED_SIZE)
+									.addPreferredGap(ComponentPlacement.RELATED)
+									.addComponent(panel_9, GroupLayout.DEFAULT_SIZE, 158, Short.MAX_VALUE))
+								.addComponent(panel_7, Alignment.TRAILING, GroupLayout.DEFAULT_SIZE, 259, Short.MAX_VALUE))))
+					.addGap(10))
 		);
 		gl_panelSendSMS.setVerticalGroup(
 			gl_panelSendSMS.createParallelGroup(Alignment.LEADING)
@@ -461,23 +473,24 @@ public class SendSMS extends JFrame {
 						.addGroup(gl_panelSendSMS.createSequentialGroup()
 							.addComponent(panelSMSData, GroupLayout.PREFERRED_SIZE, 126, GroupLayout.PREFERRED_SIZE)
 							.addGap(11)
-							.addComponent(panelLog, GroupLayout.DEFAULT_SIZE, 345, Short.MAX_VALUE))
+							.addComponent(panelLog, GroupLayout.DEFAULT_SIZE, 421, Short.MAX_VALUE))
 						.addGroup(gl_panelSendSMS.createSequentialGroup()
-							.addGroup(gl_panelSendSMS.createParallelGroup(Alignment.LEADING)
-								.addComponent(panel_8, GroupLayout.PREFERRED_SIZE, 94, GroupLayout.PREFERRED_SIZE)
-								.addComponent(panel_9, GroupLayout.PREFERRED_SIZE, 94, GroupLayout.PREFERRED_SIZE))
-							.addComponent(panel_7, GroupLayout.PREFERRED_SIZE, 65, GroupLayout.PREFERRED_SIZE)
+							.addGroup(gl_panelSendSMS.createParallelGroup(Alignment.BASELINE)
+								.addComponent(panel_8, GroupLayout.PREFERRED_SIZE, 112, GroupLayout.PREFERRED_SIZE)
+								.addComponent(panel_9, GroupLayout.PREFERRED_SIZE, 112, GroupLayout.PREFERRED_SIZE))
 							.addPreferredGap(ComponentPlacement.RELATED)
+							.addComponent(panel_7, GroupLayout.PREFERRED_SIZE, 65, GroupLayout.PREFERRED_SIZE)
+							.addGap(2)
 							.addComponent(panel_6, GroupLayout.PREFERRED_SIZE, 241, GroupLayout.PREFERRED_SIZE)
 							.addPreferredGap(ComponentPlacement.RELATED)
-							.addComponent(panel_12, GroupLayout.DEFAULT_SIZE, 124, Short.MAX_VALUE)
-							.addPreferredGap(ComponentPlacement.RELATED)))
+							.addComponent(panel_12, GroupLayout.DEFAULT_SIZE, 126, Short.MAX_VALUE)
+							.addGap(0)))
 					.addGap(9))
 		);
 		
 		JPanel panel_13 = new JPanel();
+		panel_13.setBounds(9, 71, 242, 47);
 		panel_13.setBorder(new TitledBorder(null, "", TitledBorder.LEADING, TitledBorder.TOP, null, null));
-		panel_13.setBounds(9, 68, 242, 47);
 		panel_12.add(panel_13);
 		
 		JButton btnGetDLR = new JButton("Display DLRs");
@@ -486,6 +499,7 @@ public class SendSMS extends JFrame {
 				DisplayDeliveryReports();
 			}
 		});
+		panel_13.setLayout(new FlowLayout(FlowLayout.CENTER, 5, 5));
 		btnGetDLR.setActionCommand("SendSMS");
 		panel_13.add(btnGetDLR);
 		
@@ -510,11 +524,21 @@ public class SendSMS extends JFrame {
 				} catch (Exception e1) {
 					e1.printStackTrace();
 					smsLogListModel.addElement(e1.getMessage());
+					smsLogListModel.removeElement("Initializing...");
 				}		
 			}
 		});
-		btnInit.setBounds(9, 68, 57, 17);
+		btnInit.setBounds(9, 68, 76, 17);
 		panel_8.add(btnInit);
+		
+		JButton btnUnbind = new JButton("Unbind");
+		btnUnbind.addActionListener(new ActionListener() {
+			public void actionPerformed(ActionEvent e) {
+				clientUnbind();	
+			}
+		});
+		btnUnbind.setBounds(9, 88, 76, 17);
+		panel_8.add(btnUnbind);
 		
 		JLabel lblProtocolId = new JLabel("Protocol Id:");
 		lblProtocolId.setBounds(20, 213, 95, 14);
@@ -572,7 +596,7 @@ public class SendSMS extends JFrame {
 		panelHLRLog.setBorder(new TitledBorder(null, "", TitledBorder.LEADING, TitledBorder.TOP, null, null));
 		panelHLRLog.setLayout(new CardLayout(0, 0));
 		
-		JList listHLR = new JList(hlrLogListModel);	
+		listHLR = new JList(hlrLogListModel);	
 		listHLR.setVisibleRowCount(-1);
 		JScrollPane pane1 = new JScrollPane(listHLR);	
 		panelHLRLog.add(pane1, "name_391641949992302");
@@ -866,17 +890,21 @@ public class SendSMS extends JFrame {
 		getContentPane().add(tabbedPane);
 	}
 	
+
 	protected void setClient() {
 		try {
 			client = new ClientSMS(true);		
 			initProtocol(client.getConfiguration().getDefaultProtocol());			
 		} catch (Exception e) {
 			smsLogListModel.addElement(e.getMessage());
+			smsLogListModel.removeElement("Initializing...");
 		}
 	}
 	
 	protected void initProtocol(ProtocolType protocolType) throws DeliveryReportListenerException, IncomingMessageListenerException {
-		client.disconnect();	
+		smsLogListModel.addElement("Initializing...");
+		
+		client.disconnect();
 		
 		actionInProgress = true;
 		if (protocolType.equals(ProtocolType.smpp)) {		
@@ -892,6 +920,16 @@ public class SendSMS extends JFrame {
 			
 		addDeliveryReportLisntener();
 		addIncomingMessageLisntener();			
+		
+		
+		
+		smsLogListModel.removeElement("Initializing...");
+		smsLogListModel.addElement("Application resources successfully initialized.");		
+	}
+	
+	protected void clientUnbind() {
+		client.disconnect();
+		smsLogListModel.addElement("Application resources successfully unbounded.");	
 	}
 	
 	protected void addDeliveryReportLisntener() throws DeliveryReportListenerException  {
@@ -902,21 +940,25 @@ public class SendSMS extends JFrame {
 				if (arg2.equals(DLRType.sms) || arg2.equals(DLRType.flash)) {
 					if (!arg0.equals("")) {
 						smsLogListModel.addElement("DLR: " + arg0);	
+						listSMS.scrollRectToVisible(listSMS.getCellBounds(smsLogListModel.size() - 1, smsLogListModel.size() - 1));
 					}
 					if ((!(arg1 == null)) && (!arg1.isEmpty())) { 				
 						for (String dlr : arg1) {
 							smsLogListModel.addElement("DLR: " + dlr);		
+						    listSMS.scrollRectToVisible(listSMS.getCellBounds(smsLogListModel.size() - 1, smsLogListModel.size() - 1));
 						}					
 					}
 
 				} else if (arg2.equals(DLRType.hlr)) {
 					if (!arg0.equals("")) {
 						hlrLogListModel.addElement("HLR: " + arg0);	
+						listHLR.scrollRectToVisible(listHLR.getCellBounds(hlrLogListModel.size() - 1, hlrLogListModel.size() - 1));
 					}
 					
 					if ((!(arg1 == null)) && (!arg1.isEmpty())) {		
 						for (String dlr : arg1) {
 							hlrLogListModel.addElement("HLR: " + dlr);	
+							listHLR.scrollRectToVisible(listHLR.getCellBounds(hlrLogListModel.size() - 1, hlrLogListModel.size() - 1));			
 						}				
 					}	
 				}						
@@ -929,7 +971,7 @@ public class SendSMS extends JFrame {
 			@Override
 			public void onIncmomingMessageReceived(String arg0, List<InboxMessage> arg1) {
 				if (!arg0.equals("")) {
-					smsLogListModel.addElement("MO: " + arg0);	
+					smsLogListModel.addElement("MO: " + arg0);				
 				}
 				
 				if ((!(arg1 == null)) && (!arg1.isEmpty())) { 
@@ -937,100 +979,94 @@ public class SendSMS extends JFrame {
 						smsLogListModel.addElement("MO: " + inbMsg.toString());		
 					}		
 				}
+				
+				listSMS.scrollRectToVisible(listSMS.getCellBounds(smsLogListModel.size() - 1, smsLogListModel.size() - 1));
 			}
 		});
 	}
 	
 	private void sendSMS() {
-		SMS sms = new SMS();
-
-		Message message = new Message();
-
-		message.setSender(txtSMSSender.getText());
+		SMS sms = new SMS();				
+		String[] senders = txtSMSSender.getText().split(";");
 		
-		addRecipients(message);
+		for (String sender : senders) {
+			Message message = new Message();
+			
+			message.setSender(sender);		
 		
-		String text = txtSMSMessage.getText();
-		if (chkSendBinaryMessage.isSelected()) {			
-			message.setBinary(text);
-		} else {			
-			message.setText(text);	
+			this.addRecipients(message);
+			
+			String text = txtSMSMessage.getText();
+			if (chkSendBinaryMessage.isSelected()) {			
+				message.setBinary(text);
+			} else {			
+				message.setText(text);	
 
-			if (chkFixText.isSelected()) {
-				try {
-					message.fixText();
-				} catch (UnsupportedEncodingException e) {
-					e.printStackTrace();
+				if (chkFixText.isSelected()) {
+					try {
+						message.fixText();
+					} catch (UnsupportedEncodingException e) {
+						e.printStackTrace();
+					}
 				}
 			}
-		}
 
-		if (chkSendAsFlash.isSelected()) {
-			message.setFlash(1);
-		}
-		
-		if (chkFixSourceOptions.isSelected()) {
-			message.fixSenderOptions();
-		}
-
-		if (chkFixDestOptions.isSelected()) {
-			message.fixDestOptions(txtSMSDestination.getText());
-		}
-
-		if (!txtDataCoding.getText().isEmpty()) {
-			message.setDatacoding((byte)Integer.parseInt(txtDataCoding.getText()));
-		}
-		
-		if (!txtEsmClass.getText().isEmpty()) {
-			message.setEsmclass((byte)Integer.parseInt(txtEsmClass.getText()));
-		}
-		
-		if (!txtSourceTon.getText().isEmpty()) {
-			message.setSrcton(Integer.parseInt(txtSourceTon.getText()));
-		}
-		
-		if (!txtSourceNpi.getText().isEmpty()) {
-			message.setSrcnpi(Integer.parseInt(txtSourceNpi.getText()));
-		}
-		
-		if (!txtDestinationTon.getText().isEmpty()) {
-			message.setDestton(Integer.parseInt(txtDestinationTon.getText()));
-		}
-		
-		if (!txtDestinationNpi.getText().isEmpty()) {
-			message.setDestnpi(Integer.parseInt(txtDestinationNpi.getText()));
-		}
-		
-		if (!chkPushMessage.isSelected()) {
-			message.setNoPush(1);			
-		} else {
-			message.setDrPushUrl(txtPushUrl.getText());
-		}
-		
-		if (!txtProtocolId.getText().isEmpty()) {
-			message.setProtocolid(Integer.parseInt(txtProtocolId.getText()));
-		}
-		
-		if (!txtValidityPeriod.getText().isEmpty()) {
-			message.setValidityPeriod(txtValidityPeriod.getText());
-		}
-		
-		sms.addMessage(message);
-
-		//Add response to the list
-		try {
-			
-			List<String> ls = client.sendSMS(sms);
-			if (!ls.isEmpty()) {
-				
-				for (String res : ls) {
-					smsLogListModel.addElement(res);
-				}		
+			if (chkSendAsFlash.isSelected()) {
+				message.setFlash(1);
 			}
 			
-		} catch (SendSmsException e) {	
-			JOptionPane.showMessageDialog(this,e.getMessage(), "Send Message",JOptionPane.ERROR_MESSAGE);
+			if (chkFixSourceOptions.isSelected()) {
+				message.fixSenderOptions();
+			}
+
+			if (chkFixDestOptions.isSelected()) {
+				message.fixDestOptions(txtSMSDestination.getText());
+			}
+
+			if (!txtDataCoding.getText().isEmpty()) {
+				message.setDatacoding((byte)Integer.parseInt(txtDataCoding.getText()));
+			}
+			
+			if (!txtEsmClass.getText().isEmpty()) {
+				message.setEsmclass((byte)Integer.parseInt(txtEsmClass.getText()));
+			}
+			
+			if (!txtSourceTon.getText().isEmpty()) {
+				message.setSrcton(Integer.parseInt(txtSourceTon.getText()));
+			}
+			
+			if (!txtSourceNpi.getText().isEmpty()) {
+				message.setSrcnpi(Integer.parseInt(txtSourceNpi.getText()));
+			}
+			
+			if (!txtDestinationTon.getText().isEmpty()) {
+				message.setDestton(Integer.parseInt(txtDestinationTon.getText()));
+			}
+			
+			if (!txtDestinationNpi.getText().isEmpty()) {
+				message.setDestnpi(Integer.parseInt(txtDestinationNpi.getText()));
+			}
+			
+			if (!chkPushMessage.isSelected()) {
+				message.setNoPush(1);			
+			} else {
+				message.setDrPushUrl(txtPushUrl.getText());
+			}
+			
+			if (!txtProtocolId.getText().isEmpty()) {
+				message.setProtocolid(Integer.parseInt(txtProtocolId.getText()));
+			}
+			
+			if (!txtValidityPeriod.getText().isEmpty()) {
+				message.setValidityPeriod(txtValidityPeriod.getText());
+			}
+			
+			sms.addMessage(message);	
 		}
+		
+		ExecutorService threadExec = Executors.newFixedThreadPool(1);
+		Runnable poller = new SendMessages(client, sms);	
+		threadExec.submit(poller);
 	}	
 	
 	private void addRecipients(Message message) {
@@ -1271,4 +1307,31 @@ public class SendSMS extends JFrame {
 
 		return sb.toString();
 	}	
+	
+	public class SendMessages implements Runnable {
+		private ClientSMS client = null;
+		private SMS sms = null;
+		
+		public SendMessages(ClientSMS client, SMS sms) {
+			this.client = client;
+			this.sms = sms;
+		}
+		
+	    public void run() {
+	    	try {		
+				List<String> ls = client.sendSMS(sms);
+				if (!ls.isEmpty()) {
+					
+					for (String res : ls) {	
+						smsLogListModel.addElement(res);				
+					}	
+					
+					listSMS.scrollRectToVisible(listSMS.getCellBounds(smsLogListModel.size() - 1, smsLogListModel.size() - 1));
+				}		
+			} catch (SendSmsException e) {	
+				smsLogListModel.addElement(e.getMessage());	
+				listSMS.scrollRectToVisible(listSMS.getCellBounds(smsLogListModel.size() - 1, smsLogListModel.size() - 1));
+			}		
+	    }
+	}
 }
